@@ -154,3 +154,6 @@ class Logger:
 
     def get_logger(self) -> logging.Logger:
         return self.logger
+
+
+logger = Logger().get_logger()
