@@ -12,5 +12,6 @@ class LiveEvent:
     platform: str
     event_type: str
     sender: str
-    value_normalized: int
+    value: int | float
+    raw_value: str
     timestamp: datetime

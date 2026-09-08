@@ -1,11 +1,8 @@
-from abc import ABC, abstractmethod
-
-from app.domain.live_event import LiveEvent
+from typing import Protocol
 
 
-class GameEventSinkPort(ABC):
+class GameEventSinkPort(Protocol):
     """Salida: destino del evento dentro del juego de Roblox."""
 
-    @abstractmethod
-    async def publish(self, event: LiveEvent) -> None:
-        raise NotImplementedError
+    async def publish(self, topic: str, payload: dict) -> None:
+        ...

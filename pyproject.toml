@@ -21,7 +21,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "strict"
+addopts = "-m 'not integration'"
+asyncio_mode = "auto"
 markers = [
-    "asyncio: marca un test como asincrono (pytest-asyncio)",
+    "integration: tests que requieren credenciales/servicios reales, no corren por defecto",
 ]

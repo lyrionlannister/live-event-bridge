@@ -1,19 +1,11 @@
-from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator
+from typing import Protocol
 
 from app.domain.live_event import LiveEvent
 
 
-class LiveEventSourcePort(ABC):
+class LiveEventSourcePort(Protocol):
     """Entrada: fuente de eventos de una plataforma de streaming en vivo."""
 
-    @abstractmethod
-    async def start(
-        self, on_event: Callable[[LiveEvent], Awaitable[None]]
-    ) -> None:
-        """Empieza a escuchar eventos y los entrega vía on_event."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def stop(self) -> None:
-        raise NotImplementedError
+    async def subscribe(self, stream_id: str) -> AsyncIterator[LiveEvent]:
+        ...

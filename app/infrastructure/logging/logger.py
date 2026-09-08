@@ -6,7 +6,7 @@ import logging
 import os
 
 from datetime import datetime
-from app.infrastructure.settings.env import get_or_throw
+from app.infrastructure.config.env import get_or_throw
 
 
 class MonthlyDailyRotatingFileHandler(logging.Handler):
