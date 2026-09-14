@@ -23,3 +23,7 @@ uv.lock
 
 # Logs de la app (ver app/infrastructure/logging)
 logs/
+
+.vscode/
+settings.json
+settings.local.json

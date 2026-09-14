@@ -19,21 +19,19 @@ from TikTokLive.events import (
 from websockets.legacy.exceptions import InvalidStatusCode
 
 from app.domain.live_event import LiveEvent
+from app.infrastructure.tiktok.settings import (
+    GIFT_EVENT_TYPE,
+    INITIAL_BACKOFF_SECONDS,
+    KNOWN_PARSE_ERROR_FINGERPRINTS,
+    MAX_BACKOFF_SECONDS,
+    OFFLINE_BACKOFF_SECONDS,
+    PLATFORM,
+    configure_sign_api_key,
+)
 
 logger = logging.getLogger("live-event-bridge")
 
-PLATFORM = "tiktok"
-GIFT_EVENT_TYPE = "GIFT"
-
-_INITIAL_BACKOFF_SECONDS = 1.0
-_MAX_BACKOFF_SECONDS = 60.0
-_OFFLINE_BACKOFF_SECONDS = 30.0
-
-# Bugs de schema de protobuf upstream (TikTokLive/betterproto2) que no podemos
-# arreglar acá; se degradan a DEBUG en vez de ensuciar los logs con ERROR.
-_KNOWN_PARSE_ERROR_FINGERPRINTS = [
-    "HashtagNamespace",  # WebcastLinkLayerMessage, no usado por este MVP
-]
+configure_sign_api_key()
 
 
 class TikTokUnofficialAdapter:
@@ -57,11 +55,11 @@ class TikTokUnofficialAdapter:
     async def _run_with_reconnect(
         self, stream_id: str, events: "asyncio.Queue[LiveEvent]"
     ) -> None:
-        backoff = _INITIAL_BACKOFF_SECONDS
+        backoff = INITIAL_BACKOFF_SECONDS
 
         while True:
             client = TikTokLiveClient(unique_id=stream_id)
-            client.parse_error_ignorelist.extend(_KNOWN_PARSE_ERROR_FINGERPRINTS)
+            client.parse_error_ignorelist.extend(KNOWN_PARSE_ERROR_FINGERPRINTS)
 
             @client.on(ConnectEvent)
             async def _on_connect(event: ConnectEvent) -> None:
@@ -128,12 +126,12 @@ class TikTokUnofficialAdapter:
                 logger.info("Conectando a TikTok LIVE de %s", stream_id)
                 await client.connect()
                 logger.warning("Desconectado de TikTok LIVE de %s", stream_id)
-                backoff = _INITIAL_BACKOFF_SECONDS
+                backoff = INITIAL_BACKOFF_SECONDS
             except UserOfflineError:
                 logger.info("%s no está en vivo todavía", stream_id)
-                backoff = max(backoff, _OFFLINE_BACKOFF_SECONDS)
+                backoff = max(backoff, OFFLINE_BACKOFF_SECONDS)
             except SignatureRateLimitError as error:
-                backoff = max(backoff, error.retry_after or _OFFLINE_BACKOFF_SECONDS)
+                backoff = max(backoff, error.retry_after or OFFLINE_BACKOFF_SECONDS)
                 logger.warning(
                     "Sign server de TikTok rate-limited para %s, esperando %.1fs",
                     stream_id,
@@ -151,7 +149,7 @@ class TikTokUnofficialAdapter:
 
             logger.info("Reintentando conexión a TikTok en %.1fs", backoff)
             await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, _MAX_BACKOFF_SECONDS)
+            backoff = min(backoff * 2, MAX_BACKOFF_SECONDS)
 
     @staticmethod
     def _sender_name(user: object) -> str:
