@@ -11,7 +11,9 @@ class LiveEvent:
 
     platform: str
     event_type: str
+    channel: str
     sender: str
+    gift: str
     value: int | float
     raw_value: str
     timestamp: datetime

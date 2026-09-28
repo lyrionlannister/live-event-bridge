@@ -1,7 +1,10 @@
 services:
+
   redis:
     build: ./redis
     restart: unless-stopped
+    environment:
+      - TZ=America/Monterrey
     ports:
       - "6379:6379"
     volumes:
@@ -12,6 +15,8 @@ services:
       context: .
       dockerfile: app/Dockerfile
     restart: unless-stopped
+    environment:
+      - TZ=America/Monterrey
     env_file:
       - .env
     ports:

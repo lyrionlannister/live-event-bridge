@@ -11,12 +11,18 @@ from tests.fakes.fake_live_event_source import FakeLiveEventSource
 
 
 def _make_event(
-    event_type: str = "GIFT", sender: str = "user1", value: int = 10
+    event_type: str = "GIFT",
+    sender: str = "user1",
+    value: int = 10,
+    channel: str = "canal_demo",
+    gift: str = "Rose",
 ) -> LiveEvent:
     return LiveEvent(
         platform="tiktok",
         event_type=event_type,
+        channel=channel,
         sender=sender,
+        gift=gift,
         value=value,
         raw_value=str(value),
         timestamp=datetime.now(timezone.utc),
@@ -55,7 +61,9 @@ async def _run_until_and_stop(
 
 
 async def test_evento_gift_se_publica_correctamente():
-    source = FakeLiveEventSource([_make_event(event_type="GIFT", sender="ana", value=50)])
+    source = FakeLiveEventSource(
+        [_make_event(event_type="GIFT", sender="ana", value=50, channel="ana_live", gift="Rose")]
+    )
     queue = FakeEventQueue()
     sink = FakeGameEventSink()
     use_case = ProcessLiveEvent(source, queue, sink, topic="mi-topic", stream_id="ana_live")
@@ -64,9 +72,14 @@ async def test_evento_gift_se_publica_correctamente():
 
     topic, payload = sink.published[0]
     assert topic == "mi-topic"
+    assert payload["v"] == 1
+    assert payload["type"] == "gift"
+    assert payload["platform"] == "tiktok"
+    assert payload["channel"] == "ana_live"
     assert payload["sender"] == "ana"
+    assert payload["gift"] == "Rose"
     assert payload["value"] == 50
-    assert payload["event_type"] == "GIFT"
+    assert isinstance(payload["ts"], int)
 
 
 async def test_evento_no_gift_se_ignora():

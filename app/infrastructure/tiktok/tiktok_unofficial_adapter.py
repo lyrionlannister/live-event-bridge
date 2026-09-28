@@ -6,16 +6,7 @@ from datetime import datetime, timezone
 
 from TikTokLive import TikTokLiveClient
 from TikTokLive.client.errors import SignatureRateLimitError, UserOfflineError
-from TikTokLive.events import (
-    CommentEvent,
-    ConnectEvent,
-    FollowEvent,
-    GiftEvent,
-    JoinEvent,
-    LikeEvent,
-    ShareEvent,
-    SocialEvent,
-)
+from TikTokLive.events import ConnectEvent, GiftEvent
 from websockets.legacy.exceptions import InvalidStatusCode
 
 from app.domain.live_event import LiveEvent
@@ -74,53 +65,7 @@ class TikTokUnofficialAdapter:
                 if event.value is None:
                     return  # regalo en medio de un streak, aún no es el conteo final
 
-                await events.put(self._to_live_event(event))
-
-            @client.on(CommentEvent)
-            async def _on_comment(event: CommentEvent) -> None:
-                logger.info(
-                    "TikTok comentario: sender=%s texto=%r",
-                    self._sender_name(event.user),
-                    event.content,
-                )
-
-            @client.on(LikeEvent)
-            async def _on_like(event: LikeEvent) -> None:
-                logger.info(
-                    "TikTok like: sender=%s count=%s total=%s",
-                    self._sender_name(event.user),
-                    event.count,
-                    event.total,
-                )
-
-            @client.on(JoinEvent)
-            async def _on_join(event: JoinEvent) -> None:
-                logger.info(
-                    "TikTok usuario entró al stream: sender=%s",
-                    self._sender_name(event.user),
-                )
-
-            @client.on(FollowEvent)
-            async def _on_follow(event: FollowEvent) -> None:
-                logger.info(
-                    "TikTok nuevo follow: sender=%s",
-                    self._sender_name(event.user),
-                )
-
-            @client.on(ShareEvent)
-            async def _on_share(event: ShareEvent) -> None:
-                logger.info(
-                    "TikTok share: sender=%s",
-                    self._sender_name(event.user),
-                )
-
-            @client.on(SocialEvent)
-            async def _on_social(event: SocialEvent) -> None:
-                logger.info(
-                    "TikTok evento social: sender=%s action=%s",
-                    self._sender_name(event.user),
-                    event.action,
-                )
+                await events.put(self._to_live_event(event, stream_id))
 
             try:
                 logger.info("Conectando a TikTok LIVE de %s", stream_id)
@@ -158,13 +103,16 @@ class TikTokUnofficialAdapter:
         return getattr(user, "unique_id", None) or getattr(user, "nickname", None) or "desconocido"
 
     @classmethod
-    def _to_live_event(cls, event: GiftEvent) -> LiveEvent:
+    def _to_live_event(cls, event: GiftEvent, channel: str) -> LiveEvent:
         diamond_count = event.gift.diamond_count if event.gift is not None else 0
+        gift_name = event.gift.name if event.gift is not None else "desconocido"
 
         return LiveEvent(
             platform=PLATFORM,
             event_type=GIFT_EVENT_TYPE,
+            channel=channel,
             sender=cls._sender_name(event.user),
+            gift=gift_name,
             value=event.value or 0,
             raw_value=str(diamond_count),
             timestamp=datetime.now(timezone.utc),
