@@ -9,6 +9,7 @@ from app.domain.live_event import LiveEvent
 logger = logging.getLogger("live-event-bridge")
 
 GIFT_EVENT_TYPE = "GIFT"
+SCHEMA_VERSION = 1
 
 
 class ProcessLiveEvent:
@@ -29,8 +30,23 @@ class ProcessLiveEvent:
         self._stream_id = stream_id
 
     async def run(self) -> None:
-        """Corre productor y consumidor de forma concurrente hasta que se cancele."""
-        await asyncio.gather(self._produce(), self._consume())
+        """Corre productor y consumidor de forma concurrente hasta que se cancele.
+
+        Si uno de los dos muere por una excepción, se cancela el otro y se
+        relanza el error, en vez de dejarlo corriendo huérfano en silencio
+        (ej. si Redis no está listo todavía cuando arranca el consumidor).
+        """
+        tasks = [asyncio.create_task(self._produce()), asyncio.create_task(self._consume())]
+        try:
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+            for task in pending:
+                task.cancel()
+            for task in done:
+                task.result()
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            raise
 
     async def _produce(self) -> None:
         async for event in self._source.subscribe(self._stream_id):
@@ -64,11 +80,14 @@ class ProcessLiveEvent:
 
     @staticmethod
     def _to_payload(event: LiveEvent) -> dict:
+        """Arma el mensaje según roblox-sdk/contract/schema-v1.md."""
         return {
+            "v": SCHEMA_VERSION,
+            "type": "gift",
             "platform": event.platform,
-            "event_type": event.event_type,
+            "channel": event.channel,
             "sender": event.sender,
+            "gift": event.gift,
             "value": event.value,
-            "raw_value": event.raw_value,
-            "timestamp": event.timestamp.isoformat(),
+            "ts": round(event.timestamp.timestamp() * 1000),
         }

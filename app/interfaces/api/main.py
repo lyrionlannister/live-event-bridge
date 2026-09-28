@@ -1,6 +1,6 @@
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 from dotenv import load_dotenv
 
@@ -8,37 +8,51 @@ load_dotenv()
 
 from fastapi import FastAPI
 
-from app.infrastructure.config.env import get_or_throw
+from app.application.use_cases.process_live_event import ProcessLiveEvent
+from app.infrastructure.config.env import get_or_default, get_or_throw
 from app.infrastructure.logging.logger import logger
+from app.infrastructure.queue.redis_queue_adapter import RedisQueueAdapter
+from app.infrastructure.roblox.roblox_open_cloud_adapter import RobloxOpenCloudAdapter
 from app.infrastructure.tiktok.tiktok_unofficial_adapter import TikTokUnofficialAdapter
 
-_tiktok_task: asyncio.Task | None = None
+_process_task: asyncio.Task | None = None
 
 
-async def _log_tiktok_events(stream_id: str) -> None:
-    """Suscribe a TikTok LIVE y loggea cada evento recibido."""
-    source = TikTokUnofficialAdapter()
-    async for event in source.subscribe(stream_id):
-        logger.info(
-            "TikTok evento: tipo=%s sender=%s valor=%s",
-            event.event_type,
-            event.sender,
-            event.value,
-        )
+def _log_if_failed(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("El pipeline de eventos murió inesperadamente", exc_info=exc)
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    global _tiktok_task
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    global _process_task
 
     tiktok_username = get_or_throw("TIKTOK_USERNAME")
-    _tiktok_task = asyncio.create_task(_log_tiktok_events(tiktok_username))
+    redis_url = get_or_throw("REDIS_URL")
+    roblox_api_key = get_or_throw("ROBLOX_API_KEY")
+    roblox_universe_id = get_or_throw("ROBLOX_UNIVERSE_ID")
+    roblox_topic = get_or_default("ROBLOX_TOPIC", "live-events")
+
+    use_case = ProcessLiveEvent(
+        source=TikTokUnofficialAdapter(),
+        queue=RedisQueueAdapter(redis_url),
+        sink=RobloxOpenCloudAdapter(api_key=roblox_api_key, universe_id=roblox_universe_id),
+        topic=roblox_topic,
+        stream_id=tiktok_username,
+    )
+    _process_task = asyncio.create_task(use_case.run())
+    _process_task.add_done_callback(_log_if_failed)
+    logger.info("live-event-bridge iniciado: escuchando TikTok LIVE de %s", tiktok_username)
 
     yield
 
-    _tiktok_task.cancel()
+    _process_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
-        await _tiktok_task
+        await _process_task
+    logger.info("live-event-bridge detenido")
 
 
 app = FastAPI(title="live-event-bridge", lifespan=lifespan)
