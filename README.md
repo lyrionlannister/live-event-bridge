@@ -1,6 +1,6 @@
 # live-event-bridge
 
-Puente en tiempo real entre **TikTok LIVE** y **Roblox**: escucha los eventos de una transmisión (regalos, likes, comentarios, follows), los encola en **Redis** y los publica en un juego de Roblox mediante **Roblox Open Cloud Messaging**, donde un SDK en Luau los decodifica y dispara acciones dentro del juego.
+Puente en tiempo real entre **TikTok LIVE** y **Roblox**: escucha los regalos de una transmisión, los encola en **Redis** y los publica en un juego de Roblox mediante **Roblox Open Cloud Messaging**, donde un SDK en Luau los decodifica y dispara acciones dentro del juego.
 
 ## Arquitectura
 
