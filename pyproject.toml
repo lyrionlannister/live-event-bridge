@@ -1,0 +1,28 @@
+[project]
+name = "live-event-bridge"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "httpx>=0.28.1",
+    "pydantic>=2.13.5",
+    "python-dotenv>=1.2.3",
+    "redis>=5",
+    "tiktoklive>=7.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not integration'"
+asyncio_mode = "auto"
+markers = [
+    "integration: tests que requieren credenciales/servicios reales, no corren por defecto",
+]
